@@ -35,6 +35,9 @@ char *png_header = "HTTP/1.1 200 OK\r\n"
         "Connection: close\r\n"
         "Content-Type: image/png\r\n\r\n";
 
+char *download_header = "HTTP/1.1 200 OK\r\n"
+        "Connection: close\r\n"
+        "Content-Type: application/octet-stream\r\n\r\n";
 
 char *error = "HTTP/1.1 400 Bad Request\r\n";
 
@@ -182,6 +185,7 @@ int main(int argc, char *argv[]) {
                             while (buf[k] != ' ') k++;
                             if (buf[k-1]=='s' && buf[k-2]=='s' && buf[k-3]=='c') h = css_header;
                             else if (buf[k-1]=='g' && buf[k-2]=='n' && buf[k-3]=='p') h = png_header;
+                            else if (buf[k-1]=='p' || buf[k-1]=='r' || buf[k-1]=='z') h = download_header;
 
                             // Data
                             memset(www+5, 0, sizeof(www)-6);
