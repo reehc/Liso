@@ -8,11 +8,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <wait.h>
+#include <sys/stat.h>
 #include "clog.h"
 #include "parse.h"
 
 #define CHEER_PORT "7777"
-#define BUF_SIZE 4096
+#define BUF_SIZE 8192
 
 int close_socket(int sock) {
     if (close(sock)) {
@@ -38,8 +39,6 @@ char *png_header = "HTTP/1.1 200 OK\r\n"
 char *error = "HTTP/1.1 400 Bad Request\r\n";
 
 char www[256] = "./www/";
-
-char html[8191];
 
 int main(int argc, char *argv[]) {
     int sock, client_sock;  // server and client sock descriptor
@@ -154,7 +153,6 @@ int main(int argc, char *argv[]) {
                     } else {
                         // Request *request = parse(buf, readret, client_sock);
 
-                        // buf[readret] = '\0';
                         int valid = 1;
                         for (int j = 0; j < readret; ++j) {
                             if (buf[j] == '\r' && buf[j+1] != '\n') {
@@ -170,6 +168,13 @@ int main(int argc, char *argv[]) {
                             }
                         }
 
+                        for (int k = 0; k < readret ; ++k) {
+                            if (buf[k] == '.' && buf[k+1] == '.') {
+                                valid = 0;
+                                break;
+                            }
+                        }
+
                         if (valid && buf[0] - 'G' == 0 && buf[1] - 'E' == 0 && buf[2] - 'T' == 0) {
                             // Content type
                             char *h = header;
@@ -177,8 +182,6 @@ int main(int argc, char *argv[]) {
                             while (buf[k] != ' ') k++;
                             if (buf[k-1]=='s' && buf[k-2]=='s' && buf[k-3]=='c') h = css_header;
                             else if (buf[k-1]=='g' && buf[k-2]=='n' && buf[k-3]=='p') h = png_header;
-                            if (send(i, h, strlen(h), 0) == -1)
-                                perror("send");
 
                             // Data
                             memset(www+5, 0, sizeof(www)-6);
@@ -190,22 +193,23 @@ int main(int argc, char *argv[]) {
                                 char str[11] = "index.html";
                                 strcpy(&www[j+1], str);
                             }
-                            printf("req file: %s\n", www);
+
                             FILE *fp = fopen(www, "r");
+                            struct stat st;
+                            char *file;
                             if (fp != NULL) {
-                                memset(buf, 0, sizeof(buf));
-                                size_t newLen = fread(buf, sizeof(char), BUF_SIZE, fp);
-                                if ( ferror( fp ) != 0 ) {
+                                stat(www, &st);
+                                file = malloc(sizeof(char) * st.st_size);
+                                size_t newLen = fread(file, st.st_size, 1, fp);
+                                if ( ferror( fp ) != 0 )
                                     fputs("Error reading file", stderr);
-                                } else {
-                                    buf[newLen++] = '\0'; /* Just to be safe. */
-                                }
                                 fclose(fp);
+                                if (send(i, h, strlen(h), 0) == -1 || send(i, file, st.st_size, 0) == -1)
+                                    perror("send");
                             } else {
-                                printf("%s not exist!\n", www);
+                                if (send(i, error, strlen(error), 0) == -1)
+                                    perror("send");
                             }
-                            if (send(i, buf, strlen(buf), 0) == -1)
-                                perror("send");
                         } else if (valid && buf[0] - 'P' == 0 && buf[1] - 'O' == 0 && buf[2] - 'S' == 0 && buf[3] - 'T' == 0) {
                             if (send(i, buf, readret, 0) == -1)
                                 perror("send");
@@ -213,7 +217,7 @@ int main(int argc, char *argv[]) {
                             if (send(i, error, strlen(error), 0) == -1)
                                 perror("send");
                         }
-                        printf("over: %d\n", close(i));
+                        close(i);
                         FD_CLR(i, &master);
                     }
                 }

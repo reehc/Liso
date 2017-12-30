@@ -9,4 +9,4 @@ add_executable(echo_client.c echo_client.c)
 
 add_executable(parser example.c parse.h parse.c)
 
-# add_executable(select select.c)
+add_executable(cheer cheer.c)
